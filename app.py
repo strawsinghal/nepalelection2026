@@ -4,7 +4,7 @@ from google.genai import types
 
 # 1. Setup Client with your key
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-MODEL_ID = "gemini-3-flash-preview"
+MODEL_ID = "gemini-3-pro-preview"
 
 st.set_page_config(page_title="Nepal 165 Election Tracker", layout="wide")
 st.title("🇳🇵 Nepal Election 2026: 165 Constituency Intelligence")
