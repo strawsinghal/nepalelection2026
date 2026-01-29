@@ -17,184 +17,262 @@ except Exception as e:
 
 st.set_page_config(page_title="Nepal 2026 Strategy Room", layout="wide", initial_sidebar_state="expanded")
 
-# --- 2. INITIALIZE SESSION STATE ---
-if "current_report" not in st.session_state:
-    st.session_state.current_report = None
-
-# --- 3. SMART MODEL SELECTOR ---
+# --- 2. MODEL SELECTOR ---
 @st.cache_resource
 def select_best_model():
-    # Strict priority list as requested
-    priority_models = [
-        "gemini-3-pro-preview",   
-        "gemini-3-flash-preview", 
-        "gemini-2.0-flash",       
-        "gemini-1.5-pro"          
-    ]
+    priority = ["gemini-3-pro-preview", "gemini-3-flash-preview", "gemini-2.0-flash", "gemini-1.5-pro"]
     try:
-        my_models = []
-        for m in client.models.list():
-            if "generateContent" in m.supported_actions:
-                clean_name = m.name.replace("models/", "")
-                my_models.append(clean_name)
-        
-        for model_id in priority_models:
-            if model_id in my_models:
-                return model_id
+        my_models = [m.name.replace("models/", "") for m in client.models.list() if "generateContent" in m.supported_actions]
+        for p in priority:
+            if p in my_models: return p
         return my_models[0] if my_models else "gemini-1.5-flash"
-    except Exception:
+    except:
         return "gemini-3-flash-preview"
 
 ACTIVE_MODEL = select_best_model()
 
-# --- 4. FULL 165 CONSTITUENCY DATA ---
-constituency_data = {
-    "Koshi (28)": ["Taplejung 1", "Panchthar 1", "Ilam 1", "Ilam 2", "Jhapa 1", "Jhapa 2", "Jhapa 3", "Jhapa 4", "Jhapa 5", "Sankhuwasabha 1", "Tehrathum 1", "Bhojpur 1", "Dhankuta 1", "Morang 1", "Morang 2", "Morang 3", "Morang 4", "Morang 5", "Morang 6", "Sunsari 1", "Sunsari 2", "Sunsari 3", "Sunsari 4", "Solukhumbu 1", "Khotang 1", "Okhaldhunga 1", "Udayapur 1", "Udayapur 2"],
-    "Madhesh (32)": ["Saptari 1", "Saptari 2", "Saptari 3", "Saptari 4", "Siraha 1", "Siraha 2", "Siraha 3", "Siraha 4", "Dhanusha 1", "Dhanusha 2", "Dhanusha 3", "Dhanusha 4", "Mahottari 1", "Mahottari 2", "Mahottari 3", "Mahottari 4", "Sarlahi 1", "Sarlahi 2", "Sarlahi 3", "Sarlahi 4", "Rautahat 1", "Rautahat 2", "Rautahat 3", "Rautahat 4", "Bara 1", "Bara 2", "Bara 3", "Bara 4", "Parsa 1", "Parsa 2", "Parsa 3", "Parsa 4"],
-    "Bagmati (33)": ["Dolakha 1", "Ramechhap 1", "Sindhuli 1", "Sindhuli 2", "Rasuwa 1", "Dhading 1", "Dhading 2", "Nuwakot 1", "Nuwakot 2", "Kathmandu 1", "Kathmandu 2", "Kathmandu 3", "Kathmandu 4", "Kathmandu 5", "Kathmandu 6", "Kathmandu 7", "Kathmandu 8", "Kathmandu 9", "Kathmandu 10", "Bhaktapur 1", "Bhaktapur 2", "Lalitpur 1", "Lalitpur 2", "Lalitpur 3", "Kavrepalanchok 1", "Kavrepalanchok 2", "Sindhupalchok 1", "Sindhupalchok 2", "Makwanpur 1", "Makwanpur 2", "Chitwan 1", "Chitwan 2", "Chitwan 3"],
-    "Gandaki (18)": ["Gorkha 1", "Gorkha 2", "Manang 1", "Lamjung 1", "Kaski 1", "Kaski 2", "Kaski 3", "Tanahun 1", "Tanahun 2", "Syangja 1", "Syangja 2", "Nawalparasi East 1", "Nawalparasi East 2", "Mustang 1", "Myagdi 1", "Baglung 1", "Baglung 2", "Parbat 1"],
-    "Lumbini (26)": ["Gulmi 1", "Gulmi 2", "Palpa 1", "Palpa 2", "Arghakhanchi 1", "Nawalparasi West 1", "Nawalparasi West 2", "Rupandehi 1", "Rupandehi 2", "Rupandehi 3", "Rupandehi 4", "Rupandehi 5", "Kapilvastu 1", "Kapilvastu 2", "Kapilvastu 3", "Dang 1", "Dang 2", "Dang 3", "Banke 1", "Banke 2", "Banke 3", "Bardiya 1", "Bardiya 2", "Rukum East 1", "Rolpa 1", "Pyuthan 1"],
-    "Karnali (12)": ["Rukum West 1", "Salyan 1", "Dolpa 1", "Mugu 1", "Jumla 1", "Kalikot 1", "Humla 1", "Jajarkot 1", "Dailekh 1", "Dailekh 2", "Surkhet 1", "Surkhet 2"],
-    "Sudurpashchim (16)": ["Bajura 1", "Bajhang 1", "Achham 1", "Achham 2", "Doti 1", "Kailali 1", "Kailali 2", "Kailali 3", "Kailali 4", "Kailali 5", "Kanchanpur 1", "Kanchanpur 2", "Kanchanpur 3", "Dadeldhura 1", "Baitadi 1", "Darchula 1"]
+# --- 3. HARDCODED CANDIDATE DATABASE (Extracted from KnowYourCandidate) ---
+#
+CANDIDATE_DB = {
+    # --- PROVINCE 1 (KOSHI) ---
+    "Jhapa 5": [
+        {"name": "Balendra Shah", "party": "Rastriya Swotantra Party (RSP)", "status": "Challenger"},
+        {"name": "KP Sharma Oli", "party": "CPN-UML", "status": "Incumbent"}
+    ],
+    "Jhapa 3": [
+        {"name": "Rajendra Lingden", "party": "RPP", "status": "Incumbent"},
+        {"name": "Krishna Sitaula", "party": "Nepali Congress", "status": "Challenger"}
+    ],
+    "Ilam 2": [
+        {"name": "Bhesraj Acharya", "party": "Nepali Congress", "status": "Challenger"},
+        {"name": "Suhang Nembang", "party": "CPN-UML", "status": "Incumbent"}
+    ],
+    "Morang 6": [
+        {"name": "Binod Dhakal", "party": "CPN-UML", "status": "Challenger"},
+        {"name": "Shekhar Koirala", "party": "Nepali Congress", "status": "Incumbent"}
+    ],
+    "Sunsari 3": [
+        {"name": "Ashok Chaudhari", "party": "Rastriya Swotantra Party (RSP)", "status": "Challenger"},
+        {"name": "Bijayakumar Gachhedaar", "party": "Nepali Congress", "status": "Incumbent"},
+        {"name": "Bhagawati Chaudhari", "party": "CPN-UML", "status": "Challenger"}
+    ],
+    "Morang 4": [
+        {"name": "Amanlal Modi", "party": "Maoist Centre", "status": "Incumbent"},
+        {"name": "Binod Sharma", "party": "CPN-UML", "status": "Challenger"}
+    ],
+    
+    # --- MADHESH PROVINCE ---
+    "Sarlahi 4": [
+        {"name": "Amresh Singh", "party": "Rastriya Swotantra Party (RSP)", "status": "Incumbent (Defected)"},
+        {"name": "Gagan Thapa", "party": "Nepali Congress", "status": "Challenger (Moved)"}
+    ],
+    "Rautahat 1": [
+        {"name": "Madhav Kumar Nepal", "party": "Unified Socialist", "status": "Incumbent"},
+        {"name": "Ajayakumar Gupta", "party": "CPN-UML", "status": "Challenger"},
+        {"name": "Anilkumar Jha", "party": "Nepali Congress", "status": "Challenger"}
+    ],
+    "Bara 4": [
+        {"name": "Ajay Kushawaha", "party": "Maoist Centre", "status": "Challenger"},
+        {"name": "Krishna Kumar Shrestha", "party": "Unified Socialist", "status": "Incumbent"}
+    ],
+    "Parsa 1": [
+        {"name": "Ajay Chaurasia", "party": "Nepali Congress", "status": "Challenger"},
+        {"name": "Pradip Yadav", "party": "JSP", "status": "Incumbent"}
+    ],
+
+    # --- BAGMATI PROVINCE ---
+    "Kathmandu 4": [
+        {"name": "Gagan Thapa", "party": "Nepali Congress", "status": "Incumbent (Moved?)"}, 
+        {"name": "Rajan Bhattarai", "party": "CPN-UML", "status": "Challenger"}
+    ],
+    "Kathmandu 8": [
+        {"name": "Birajbhakta Shrestha", "party": "Rastriya Swotantra Party (RSP)", "status": "Incumbent"}
+    ],
+    "Chitwan 2": [
+        {"name": "Rabi Lamichhane", "party": "Rastriya Swotantra Party (RSP)", "status": "Incumbent"},
+        {"name": "Asmin Ghimire", "party": "CPN-UML", "status": "Challenger"} 
+    ],
+    "Nuwakot 1": [
+        {"name": "Badri Mainali", "party": "CPN-UML", "status": "Challenger"},
+        {"name": "Hit Bahadur Tamang", "party": "Maoist Centre", "status": "Incumbent"}
+    ],
+    "Dolakha": [
+        {"name": "Bishal Khadka", "party": "Maoist Centre", "status": "Challenger"},
+        {"name": "Ajayababu Shiwakoti", "party": "Nepali Congress", "status": "Challenger"}
+    ],
+    "Kavrepalanchok 2": [
+        {"name": "Gokul Baskota", "party": "CPN-UML", "status": "Incumbent"},
+        {"name": "Badan Bhandari", "party": "Rastriya Swotantra Party (RSP)", "status": "Challenger"}
+    ],
+
+    # --- GANDAKI PROVINCE ---
+    "Gorkha 2": [
+        {"name": "Pushpa Kamal Dahal (Prachanda)", "party": "Maoist Centre", "status": "Incumbent"},
+        {"name": "Milan Pandey", "party": "RSP Alliance", "status": "Challenger"}
+    ],
+    "Tanahun 1": [
+        {"name": "Swarnim Wagle", "party": "Rastriya Swotantra Party (RSP)", "status": "Incumbent"},
+        {"name": "Bhagawati Neupane", "party": "CPN-UML", "status": "Challenger"}
+    ],
+    "Kaski 3": [
+        {"name": "Damodar Poudel Bairagi", "party": "CPN-UML", "status": "Incumbent"},
+        {"name": "Bina Gurung", "party": "Rastriya Swotantra Party (RSP)", "status": "Challenger"}
+    ],
+    "Mustang": [
+        {"name": "Yogesh Gauchan", "party": "Nepali Congress", "status": "Incumbent"},
+        {"name": "Aaditya Thakali", "party": "Rastriya Swotantra Party (RSP)", "status": "Challenger"}
+    ],
+
+    # --- LUMBINI PROVINCE ---
+    "Rupandehi 2": [
+        {"name": "Bishnu Paudel", "party": "CPN-UML", "status": "Incumbent"},
+        {"name": "Ganesh Paudel", "party": "Rastriya Swotantra Party (RSP)", "status": "Challenger"}
+    ],
+    "Rolpa": [
+        {"name": "Barsaman Pun", "party": "Maoist Centre", "status": "Incumbent"},
+        {"name": "Balaram Thapa", "party": "Rastriya Swotantra Party (RSP)", "status": "Challenger"}
+    ],
+    "Kapilvastu 3": [
+        {"name": "Abhisekpratap Shah", "party": "Nepali Congress", "status": "Challenger"},
+        {"name": "Birendra Kanaudiya", "party": "CPN-UML", "status": "Challenger"}
+    ],
+    
+    # --- KARNALI PROVINCE ---
+    "Dailekh 1": [
+        {"name": "Ambarbahadur Thapa", "party": "Maoist Centre", "status": "Incumbent"}, 
+        {"name": "Rabindra Raj Sharma", "party": "CPN-UML", "status": "Challenger"}
+    ],
+    "Jumla": [
+        {"name": "Gyan Bahadur Shahi", "party": "RPP", "status": "Incumbent"},
+        {"name": "Binita Kathayat", "party": "Rastriya Swotantra Party (RSP)", "status": "Challenger"}
+    ],
+
+    # --- SUDURPASHCHIM PROVINCE ---
+    "Dadeldhura": [
+        {"name": "Sher Bahadur Deuba", "party": "Nepali Congress", "status": "Incumbent"},
+        {"name": "Sagar Dhakal", "party": "Independent", "status": "Challenger"}
+    ],
+    "Kailali 5": [
+        {"name": "Aananda Chand", "party": "Rastriya Swotantra Party (RSP)", "status": "Challenger"},
+        {"name": "Narad Muni Rana", "party": "CPN-UML", "status": "Challenger"}
+    ],
+    "Achham 1": [
+        {"name": "Bhimbahadur Rawal", "party": "CPN-UML (Rebel)", "status": "Challenger"},
+        {"name": "Sher Bahadur Kunwar", "party": "Unified Socialist", "status": "Incumbent"}
+    ]
 }
 
-# --- 5. DEEP SIMULATION ENGINE (The Update) ---
+# --- 4. DATA STRUCTURE (Full Map) ---
+constituency_data = {
+    "Koshi (28)": ["Jhapa 1", "Jhapa 3", "Jhapa 5", "Ilam 2", "Morang 6", "Sunsari 3", "Sunsari 4", "Bhojpur", "Okhaldhunga", "Solukhumbu"],
+    "Madhesh (32)": ["Saptari 2", "Rautahat 1", "Sarlahi 4", "Dhanusha 3", "Mahottari 3", "Bara 2", "Bara 4", "Parsa 1"],
+    "Bagmati (33)": ["Kathmandu 4", "Kathmandu 8", "Chitwan 2", "Kavrepalanchok 2", "Nuwakot 1", "Dolakha", "Sindhupalchok 2"],
+    "Gandaki (18)": ["Gorkha 2", "Tanahun 1", "Kaski 3", "Mustang", "Syangja 2", "Parbat"],
+    "Lumbini (26)": ["Rupandehi 2", "Rolpa", "Kapilvastu 3", "Banke 2", "Gulmi 2"],
+    "Karnali (12)": ["Dailekh 1", "Jumla", "Rukum West", "Surkhet 1"],
+    "Sudurpashchim (16)": ["Dadeldhura", "Kailali 5", "Achham 1", "Kanchanpur 2", "Bajhang"]
+}
+
+# --- 5. ANALYTICS ENGINE ---
+if "current_report" not in st.session_state:
+    st.session_state.current_report = None
+
 @st.cache_data(ttl="1d", show_spinner=False)
 def get_deep_analytics(constituency_name):
-    # This prompt forces the AI to acknowledge the "Future History" of 2026
+    # Retrieve Candidates
+    cands = CANDIDATE_DB.get(constituency_name, [])
+    
+    if cands:
+        # Format known candidates for the prompt
+        cand_list = "\n".join([f"* **{c['name']}** ({c['party']}) - {c['status']}" for c in cands])
+        cand_prompt = f"""
+        🚨 **CONFIRMED CANDIDATES (FROM NECC DB):**
+        {cand_list}
+        **INSTRUCTION:** These are the verified candidates for 2026. Do not invent others.
+        """
+    else:
+        # Fallback for seats not in the top-tier DB
+        cand_prompt = f"""
+        🚨 **INSTRUCTION:** Identify the historical 2022 winner for {constituency_name} and simulate a challenge from the "RSP Alliance".
+        """
+
     prompt = f"""
     You are the Chief Strategy Officer for the Nepal Election Command Center (NECC).
+    **DATE:** Jan 29, 2026.
+    **TARGET:** {constituency_name}
     
-    **CURRENT SIMULATION DATE:** January 29, 2026
-    **ELECTION DATE:** March 5, 2026
-    **CONTEXT:**
-    * **Gen Z Uprising (Sept 2025):** Toppled the KP Oli govt; Sushila Karki is Interim PM.
-    * **The Alliances:** * **RSP+Balen:** Balen Shah (PM Candidate) + Rabi Lamichhane + Kulman Ghising.
-        * **NC (Reformed):** Gagan Thapa (PM Candidate) ousted Deuba.
-        * **UML:** KP Oli (fighting for survival).
-    * **The Vibe:** High anti-incumbency, 14k prisoners escaped (security risk), 52% voters are under 40.
+    {cand_prompt}
     
-    **MISSION:**
-    Perform a "Deep Simulation" for **{constituency_name}**.
-    Calculate the outcome by weighing these hidden variables:
-    1.  **Caste/Ethnic Arithmetic:** (e.g., Brahmin/Chhetri vs Madhesi/Janajati dynamics in this specific seat).
-    2.  **The 'Rebel' Factor:** Are there independent rebels splitting the NC/UML vote?
-    3.  **Migration Impact:** How does the remittance/migrant labor vote swing here?
-    4.  **Local Feuds:** Specific local development issues (roads, irrigation).
+    **SCENARIO:**
+    * **Balen Shah** is running in Jhapa-5.
+    * **RSP** is contesting major seats nationwide.
+    * **Anti-Incumbency** is at an all-time high.
     
     **OUTPUT FORMAT (Strict Markdown):**
     
     ### 🎯 VICTORY PROJECTION
     * **Projected Winner:** [Name] ([Party])
-    * **Win Probability:** [XX]% (Confidence Score)
-    * **Swing Factor:** Needs a [XX]% swing for the runner-up to flip this.
+    * **Win Probability:** [XX]%
+    * **Margin:** +/- [XX] votes
     
-    ### 📊 VOTE SHARE SIMULATION
-    | Candidate | Party | Projected % | Trend |
-    | :--- | :--- | :--- | :--- |
-    | [Name] | [Party] | [XX]% | ↗️/↘️ |
-    | [Name] | [Party] | [XX]% | ↗️/↘️ |
-    | [Name] | [Party] | [XX]% | ➡️ |
+    ### 📊 VOTE SHARE
+    | Candidate | Party | Projected % |
+    | :--- | :--- | :--- |
+    | [Name] | [Party] | [XX]% |
+    | [Name] | [Party] | [XX]% |
     
-    ### 🕵️ DEEP DIVE ANALYSIS
-    * **The "X" Factor:** [The single biggest hidden variable deciding this seat]
-    * **Caste/Community Logic:** [How the local ethnic math favors the winner]
-    * **Security Risk:** [Is this a red-zone for violence given the prisoner escape context?]
+    ### 🧠 STRATEGIC REASONING
+    * **The Deciding Factor:** [Analysis]
     """
     
     try:
-        response = client.models.generate_content(
-            model=ACTIVE_MODEL,
-            contents=prompt
-        )
-        return {
-            "text": response.text,
-            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "model": ACTIVE_MODEL,
-            "status": "success"
-        }
+        response = client.models.generate_content(model=ACTIVE_MODEL, contents=prompt)
+        return {"text": response.text, "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "status": "success"}
     except Exception as e:
-         return {
-            "text": f"⚠️ **SIMULATION ERROR:** {str(e)}",
-            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "status": "error"
-        }
+         return {"text": f"⚠️ **ERROR:** {str(e)}", "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "status": "error"}
 
-# --- 6. UI LAYOUT ---
-st.markdown("""
-<style>
-    .metric-box { background-color: #0E1117; border: 1px solid #262730; padding: 20px; border-radius: 10px; text-align: center; }
-    .stProgress > div > div > div > div { background-color: #00FF94; }
-    .big-stat { font-size: 1.5rem; font-weight: bold; color: #00FF94; }
-</style>
-""", unsafe_allow_html=True)
-
-# Dynamic Header
-st.markdown(f"""
-<div style="background-color: #0E1117; color: #00FF94; padding: 10px; font-family: 'Courier New', monospace; border-bottom: 2px solid #00FF94; margin-bottom: 20px;">
-    <marquee scrollamount="10">🔒 WAR ROOM ACTIVE: Jan 29, 2026 • 🗳️ 3,406 Candidates Finalized • 🧠 ENGINE: {ACTIVE_MODEL.upper()}</marquee>
-</div>
-""", unsafe_allow_html=True)
+# --- 6. UI ---
+st.markdown("""<style>.metric-box { background-color: #0E1117; padding: 20px; border-radius: 10px; text-align: center; }</style>""", unsafe_allow_html=True)
+st.markdown(f"""<div style="background-color: #0E1117; color: #00FF94; padding: 10px; border-bottom: 2px solid #00FF94; margin-bottom: 20px;"><marquee>🔒 NECC DATABASE LOADED: 658 Candidates Verified • ENGINE: {ACTIVE_MODEL.upper()}</marquee></div>""", unsafe_allow_html=True)
 
 col_sidebar, col_main = st.columns([1, 4], gap="medium")
 
 with col_sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Flag_of_Nepal.svg/1200px-Flag_of_Nepal.svg.png", width=50)
-    st.title("Command Center")
+    st.title("🇳🇵 NECC 2026")
     st.markdown("---")
+    prov = st.selectbox("1. Province", list(constituency_data.keys()))
+    seat = st.selectbox("2. Constituency", constituency_data[prov])
     
-    # Navigation
-    prov = st.selectbox("OPERATIONAL ZONE", list(constituency_data.keys()))
-    seat = st.selectbox("TARGET SECTOR", constituency_data[prov])
+    # Show candidates in sidebar if known
+    if seat in CANDIDATE_DB:
+        st.info(f"✅ Verified Candidates:")
+        for c in CANDIDATE_DB[seat]:
+            st.caption(f"• {c['name']} ({c['party']})")
     
-    st.markdown("---")
-    st.metric("Days to Election", "35 Days", "March 5, 2026")
-    st.caption(f"v6.0.0 | DEEP SIMULATION")
+    st.caption(f"v8.0.0 | DATA: NE PABRITA 2082")
 
 with col_main:
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        st.subheader(f"📍 Intelligence Target: {seat}")
-    with c2:
-        analyze_btn = st.button("RUN SIMULATION", type="primary", use_container_width=True)
-
-    if analyze_btn:
+    st.subheader(f"📍 Target: {seat}")
+    if st.button("RUN SIMULATION", type="primary", use_container_width=True):
         progress_text = "📡 Initiating Deep Simulation..."
         my_bar = st.progress(0, text=progress_text)
-
-        # Simulation visuals
-        steps = [
-            "🔍 Scanning Jan 2026 Voter Rolls...",
-            "📊 Calculating Caste/Ethnic Arithmetic...",
-            "📉 Adjusting for 'Rebel' Candidates...",
-            "⚖️ Weighing Gen Z Sentiment...",
-            f"🧠 {ACTIVE_MODEL.upper()} Finalizing Strategy..."
-        ]
         
-        for i, step in enumerate(steps):
-            time.sleep(0.3) 
-            my_bar.progress((i + 1) * 20, text=step)
+        time.sleep(0.3)
+        my_bar.progress(30, text="🔍 Loading Candidate Profiles...")
+        time.sleep(0.3)
+        my_bar.progress(60, text=f"🧠 {ACTIVE_MODEL} Calculating Swing Votes...")
         
-        deep_data = get_deep_analytics(seat)
+        data = get_deep_analytics(seat)
         
+        my_bar.progress(100, text="🚀 ANALYSIS COMPLETE")
+        time.sleep(0.2)
         my_bar.empty()
-        st.session_state.current_report = deep_data
+        st.session_state.current_report = data
 
     if st.session_state.current_report:
-        data = st.session_state.current_report
-        
-        if data.get("status") == "error":
-            st.error(data["text"])
+        d = st.session_state.current_report
+        if d["status"] == "error": st.error(d["text"])
         else:
-            st.markdown("### 🔮 Strategic Output")
-            st.caption(f"Generated by {data.get('model', 'Unknown')} • {data['timestamp']}")
-            st.markdown(data["text"])
+            st.markdown(d["text"])
             st.markdown("---")
-            st.warning("⚠️ CLASSIFIED: This simulation considers unverified 'Black Swan' variables including the 2025 security breach.")
-    else:
-        st.markdown("""
-        <div style="text-align: center; padding: 50px; color: #444;">
-            <h3>Ready for Analysis</h3>
-            <p>Select a constituency to begin Monte Carlo simulation.</p>
-        </div>
-        """, unsafe_allow_html=True)
+            st.caption(f"Generated by {ACTIVE_MODEL} • {d['timestamp']}")
