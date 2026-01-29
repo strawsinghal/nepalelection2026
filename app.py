@@ -142,7 +142,7 @@ with col_main:
         st.subheader(f"📍 Intelligence Target: {seat}")
     with c2:
         # Fixed: Changed use_container_width to width="stretch" to stop warnings
-        analyze_btn = st.button("RUN PREDICTION", type="primary", width="stretch")
+        analyze_btn = st.button("RUN PREDICTION", type="primary")
 
     # --- PROGRESS BAR LOGIC ---
     if analyze_btn:
