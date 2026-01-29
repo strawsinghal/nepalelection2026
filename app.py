@@ -4,7 +4,7 @@ from google.genai import types
 
 # 1. Setup Client with your key (using the high-performance 2.0 Flash for grounding)
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-MODEL_ID = "gemini-2.0-flash" 
+MODEL_ID = "gemini-2.0-pro" 
 
 st.set_page_config(page_title="Nepal 2026 War Room", layout="wide")
 st.title("🇳🇵 Nepal Election 2026: 165 Constituency Intelligence")
