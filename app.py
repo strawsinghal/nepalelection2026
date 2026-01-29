@@ -17,14 +17,17 @@ except Exception as e:
 
 st.set_page_config(page_title="Nepal 2026 Strategy Room", layout="wide", initial_sidebar_state="expanded")
 
-# --- 2. SMART MODEL SELECTOR ---
+# --- 2. INITIALIZE SESSION STATE (The Fix for AttributeError) ---
+if "current_report" not in st.session_state:
+    st.session_state.current_report = None
+
+# --- 3. SMART MODEL SELECTOR ---
 @st.cache_resource
 def select_best_model():
     """
     Prioritizes ONLY the high-end models you requested.
     Checks access rights to prevent 404 crashes.
     """
-    # The strict list you requested
     priority_models = [
         "gemini-3-pro-preview",   # Tier 1: Deepest Reasoning
         "gemini-3-flash-preview", # Tier 2: High Speed & Intel
@@ -33,30 +36,25 @@ def select_best_model():
     ]
     
     try:
-        # Get list of models your API Key actually has access to
         my_models = []
         for m in client.models.list():
             if "generateContent" in m.supported_actions:
-                # INDENTATION FIXED HERE
                 clean_name = m.name.replace("models/", "")
                 my_models.append(clean_name)
         
-        # Pick the first one from your list that exists in your key's permissions
         for model_id in priority_models:
             if model_id in my_models:
                 return model_id
         
-        # If none match, return the first available one to keep app alive
         return my_models[0] if my_models else "gemini-1.5-flash"
 
     except Exception:
-        # If listing fails, blindly try Gemini 3 Flash
         return "gemini-3-flash-preview"
 
 # Detect the best model ONCE when app starts
 ACTIVE_MODEL = select_best_model()
 
-# --- 3. FULL 165 CONSTITUENCY DATA ---
+# --- 4. FULL 165 CONSTITUENCY DATA ---
 constituency_data = {
     "Koshi (28)": [
         "Taplejung 1", "Panchthar 1", "Ilam 1", "Ilam 2", 
@@ -113,7 +111,7 @@ constituency_data = {
     ]
 }
 
-# --- 4. CORE ANALYTICS ENGINE ---
+# --- 5. CORE ANALYTICS ENGINE ---
 @st.cache_data(ttl="1d", show_spinner=False)
 def get_deep_analytics(constituency_name):
     prompt = f"""
@@ -132,7 +130,6 @@ def get_deep_analytics(constituency_name):
     """
     
     try:
-        # Using the auto-selected best model
         response = client.models.generate_content(
             model=ACTIVE_MODEL,
             contents=prompt
@@ -150,7 +147,7 @@ def get_deep_analytics(constituency_name):
             "status": "error"
         }
 
-# --- 5. UI LAYOUT ---
+# --- 6. UI LAYOUT ---
 st.markdown("""
 <style>
     .metric-box { background-color: #0E1117; border: 1px solid #262730; padding: 20px; border-radius: 10px; text-align: center; }
@@ -158,7 +155,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Dynamic Header
 st.markdown(f"""
 <div style="background-color: #0E1117; color: #00FF94; padding: 10px; font-family: 'Courier New', monospace; border-bottom: 2px solid #00FF94; margin-bottom: 20px;">
     <marquee scrollamount="10">🔒 SYSTEM ACTIVE: 3,406 Candidates Tracked • 🧠 INTELLIGENCE ENGINE: {ACTIVE_MODEL.upper()}</marquee>
@@ -190,7 +186,7 @@ with col_main:
         progress_text = "📡 Initiating Satellite Uplink..."
         my_bar = st.progress(0, text=progress_text)
 
-        # Simulation of "working" steps
+        # Simulation
         for percent_complete in range(0, 30, 10):
             time.sleep(0.05) 
             my_bar.progress(percent_complete, text=f"🔍 Scanning Database... {percent_complete}%")
@@ -205,6 +201,7 @@ with col_main:
         
         st.session_state.current_report = deep_data
 
+    # This check will now work safely because we initialized it at the top
     if st.session_state.current_report:
         data = st.session_state.current_report
         
