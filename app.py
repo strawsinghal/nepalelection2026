@@ -1,15 +1,19 @@
 import streamlit as st
+import datetime
 from google import genai
 from google.genai import types
 
-# 1. Setup Gemini 3 Flash
-MODEL_ID = "gemini-3-flash-preview"
+# 1. Setup Models & Client
+# DEEP_MODEL: Used once every 24h per seat for deep reasoning (Thinking Level: High)
+DEEP_MODEL = "gemini-3-pro-preview" 
+# FAST_MODEL: Used for quick interaction (not used in this specific cache logic but good to have)
+FAST_MODEL = "gemini-3-flash-preview"
+
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 st.set_page_config(page_title="Nepal 2026: 165 Seat Predictor", layout="wide")
 
 # 2. LIVE NEWS TICKER (January 29, 2026)
-# Reflects the latest security alerts and nomination finalization
 ticker_news = [
     "🚨 NEWS: 150,000 election police to be deployed starting Feb 10.",
     "🥊 BATTLE: Tensions high in Jhapa-5 as Balen vs Oli duel enters final phase.",
@@ -32,7 +36,6 @@ st.markdown(
 st.title("🇳🇵 Nepal Election 2026: 165 Constituency Intelligence")
 
 # 3. Data Organization (All 165 Seats)
-# Categorized based on the latest 2026 electoral maps
 constituency_data = {
     "Koshi (28)": ["Taplejung 1", "Panchthar 1", "Ilam 1", "Ilam 2", "Jhapa 1", "Jhapa 2", "Jhapa 3", "Jhapa 4", "Jhapa 5", "Sankhuwasabha 1", "Tehrathum 1", "Bhojpur 1", "Dhankuta 1", "Morang 1", "Morang 2", "Morang 3", "Morang 4", "Morang 5", "Morang 6", "Sunsari 1", "Sunsari 2", "Sunsari 3", "Sunsari 4", "Solukhumbu 1", "Khotang 1", "Okhaldhunga 1", "Udayapur 1", "Udayapur 2"],
     "Madhesh (32)": ["Saptari 1", "Saptari 2", "Saptari 3", "Saptari 4", "Siraha 1", "Siraha 2", "Siraha 3", "Siraha 4", "Dhanusha 1", "Dhanusha 2", "Dhanusha 3", "Dhanusha 4", "Mahottari 1", "Mahottari 2", "Mahottari 3", "Mahottari 4", "Sarlahi 1", "Sarlahi 2", "Sarlahi 3", "Sarlahi 4", "Rautahat 1", "Rautahat 2", "Rautahat 3", "Rautahat 4", "Bara 1", "Bara 2", "Bara 3", "Bara 4", "Parsa 1", "Parsa 2", "Parsa 3", "Parsa 4"],
@@ -43,7 +46,36 @@ constituency_data = {
     "Sudurpashchim (16)": ["Bajura 1", "Bajhang 1", "Achham 1", "Achham 2", "Doti 1", "Kailali 1", "Kailali 2", "Kailali 3", "Kailali 4", "Kailali 5", "Kanchanpur 1", "Kanchanpur 2", "Kanchanpur 3", "Dadeldhura 1", "Baitadi 1", "Darchula 1"]
 }
 
-# 4. Multipage Structure UI
+# 4. The 24-Hour Cache Logic Function
+@st.cache_data(ttl="1d", show_spinner=False)
+def get_daily_deep_intel(constituency_name):
+    """
+    Runs DEEP research using Gemini 3 Pro once every 24 hours.
+    Subsequent calls for the same constituency return the cached result instantly.
+    """
+    prompt = f"""
+    Perform a professional political deep dive for {constituency_name}, Nepal (March 5, 2026 Election).
+    1. Identify major candidates using Jan 20, 2026 nomination data.
+    2. Analyze the 'Gen Z' and 'Balen-Rabi Alliance' impact.
+    3. Predict the winner probability based on ground sentiment.
+    """
+    
+    # Use Gemini 3 Pro with High Thinking Level for the Seed Research
+    response = client.models.generate_content(
+        model=DEEP_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            thinking_level="high", # Forces deep reasoning
+            tools=[types.Tool(google_search=types.GoogleSearch())]
+        )
+    )
+    
+    return {
+        "text": response.text,
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+# 5. Multipage Structure UI
 col_sidebar, col_main, col_stats = st.columns([1, 2, 1], gap="large")
 
 with col_sidebar:
@@ -59,14 +91,13 @@ with col_sidebar:
 with col_main:
     st.subheader(f"📊 Detailed Report: {seat}")
     if st.button(f"Search {seat}"):
-        with st.spinner(f"Accessing Jan 2026 data..."):
-            prompt = f"Perform a political deep dive for {seat}, Nepal. Use Jan 20, 2026 nomination data and analyze youth sentiment."
-            res = client.models.generate_content(
-                model=MODEL_ID,
-                contents=prompt,
-                config=types.GenerateContentConfig(tools=[types.Tool(google_search=types.GoogleSearch())])
-            )
-            st.markdown(res.text)
+        with st.spinner(f"Accessing Verified Jan 2026 Data for {seat}..."):
+            # Call the cached function
+            data = get_daily_deep_intel(seat)
+            
+            # Display Timestamp to show cache age
+            st.caption(f"⚡ Data Refreshed: {data['timestamp']} (Valid for 24h)")
+            st.markdown(data['text'])
 
 with col_stats:
     st.subheader("📈 Quick Pulse")
