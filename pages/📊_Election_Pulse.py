@@ -19,7 +19,7 @@ def get_sentiment_score():
     prompt = "On a scale of 0-100, what is the current public support for the RSP-Balen-Kulman alliance versus traditional parties in Nepal as of Jan 29, 2026?"
     # Using grounding to ensure it reads Jan 2026 news
     response = client.models.generate_content(
-        model="emini-3-flash-preview",
+        model="gemini-3-flash-preview",
         contents=prompt,
         config=types.GenerateContentConfig(tools=[types.Tool(google_search=types.GoogleSearch())])
     )
