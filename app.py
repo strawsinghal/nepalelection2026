@@ -58,7 +58,7 @@ with col_sidebar:
 
 with col_main:
     st.subheader(f"📊 Detailed Report: {seat}")
-    if st.button(f"🚀 Run Deep Search on {seat}"):
+    if st.button(f"Search {seat}"):
         with st.spinner(f"Accessing Jan 2026 data..."):
             prompt = f"Perform a political deep dive for {seat}, Nepal. Use Jan 20, 2026 nomination data and analyze youth sentiment."
             res = client.models.generate_content(
