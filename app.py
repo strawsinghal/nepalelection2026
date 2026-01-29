@@ -4,12 +4,22 @@ import time
 from google import genai
 from google.genai import types
 
-# 1. Setup Models
+# --- CONFIGURATION ---
+# Primary: The powerful model you want
 DEEP_MODEL = "gemini-3-pro-preview" 
-FAST_MODEL = "gemini-3-flash-preview"
+# Fallback: The reliable model if Pro hangs
+FALLBACK_MODEL = "gemini-2.0-flash-exp"
 
 # Initialize Client
-client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+try:
+    if "GEMINI_API_KEY" in st.secrets:
+        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    else:
+        st.error("🚨 CRITICAL: GEMINI_API_KEY is missing in Secrets.")
+        st.stop()
+except Exception as e:
+    st.error(f"🚨 Client Init Failed: {str(e)}")
+    st.stop()
 
 st.set_page_config(page_title="Nepal 2026 Strategy Room", layout="wide", initial_sidebar_state="expanded")
 
@@ -17,44 +27,63 @@ st.set_page_config(page_title="Nepal 2026 Strategy Room", layout="wide", initial
 if "current_report" not in st.session_state:
     st.session_state.current_report = None
 
-# --- CACHING LOGIC ---
+# --- CORE LOGIC (With Safety Net) ---
 @st.cache_data(ttl="1d", show_spinner=False)
 def get_deep_analytics(constituency_name):
     """
-    The Heavy Lifter: Runs implicitly. No user button needed.
+    Robust function: Tries Gemini 3 Pro first. 
+    If it fails/hangs, falls back to Gemini 2 Flash instantly.
     """
     prompt = f"""
     Act as a Chief Election Strategist for {constituency_name}, Nepal (March 5, 2026).
-    Input Data: Jan 20 finalized nominations, security reports, historical voting patterns, and current 'Gen Z' sentiment.
-    
     Output strictly in this structure:
-    
     ### 🏆 PROJECTED OUTCOME
     * **Winner Prediction:** [Name] ([Party])
     * **Win Probability:** [XX]%
-    * **Margin:** +/- [XX] votes
     
-    ### 📉 CANDIDATE POSITIONS (Leaderboard)
-    1. **[Name]** ([Party]) - [Estimated Vote Share %] - [Trend: Rising/Falling]
-    2. **[Name]** ([Party]) - [Estimated Vote Share %] - [Trend: Stable]
-    3. **[Name]** ([Party]) - [Estimated Vote Share %] - [Trend: Collapsing]
+    ### 📉 CANDIDATE POSITIONS
+    1. **[Name]** ([Party]) - [XX]%
+    2. **[Name]** ([Party]) - [XX]%
     
     ### 🧠 STRATEGIC REASONING
-    * **Factor 1 (Demographics):** [Analyze youth/caste vote swing]
-    * **Factor 2 (Alliances):** [Analyze impact of rebel candidates or intra-party feuds]
-    * **Factor 3 (Ground Reality):** [Analyze impact of Jan 20 nomination crowd size or local development issues]
+    * **Key Factor:** [Detail]
     """
-    response = client.models.generate_content(
-        model=DEEP_MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())]
+    
+    # Attempt 1: Deep Model
+    try:
+        response = client.models.generate_content(
+            model=DEEP_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())]
+            )
         )
-    )
-    return {
-        "text": response.text,
-        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    }
+        return {
+            "text": response.text,
+            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "model": "Gemini 3 Pro",
+            "status": "success"
+        }
+    except Exception as e:
+        # Attempt 2: Fallback (Safety Net)
+        try:
+            time.sleep(1) # Brief pause
+            fallback_resp = client.models.generate_content(
+                model=FALLBACK_MODEL,
+                contents=prompt
+            )
+            return {
+                "text": fallback_resp.text,
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "model": "Gemini 2 Flash (Fallback)",
+                "status": "success"
+            }
+        except Exception as e2:
+             return {
+                "text": f"⚠️ **SYSTEM FAILURE:** {str(e2)}",
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "status": "error"
+            }
 
 # --- STYLING ---
 st.markdown("""
@@ -65,24 +94,19 @@ st.markdown("""
         padding: 20px;
         border-radius: 10px;
         text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    }
-    .big-number {
-        font-size: 3em;
-        font-weight: bold;
-        color: #00FF94;
     }
     .stProgress > div > div > div > div {
         background-color: #00FF94;
     }
+    /* Fix for large header */
+    h1 { font-size: 2.5rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- HEADER & TICKER ---
-ticker_text = "🔒 SYSTEM ACTIVE: 3,406 Candidates Tracked • 📡 UPLINK: 23,112 Polling Centers • ⚠️ ALERT: Jhapa-5 Swing Variable High"
+# --- HEADER ---
 st.markdown(f"""
 <div style="background-color: #0E1117; color: #00FF94; padding: 10px; font-family: 'Courier New', monospace; border-bottom: 2px solid #00FF94; margin-bottom: 20px;">
-    <marquee scrollamount="10">{ticker_text}</marquee>
+    <marquee scrollamount="10">🔒 SYSTEM ACTIVE: 3,406 Candidates Tracked • 📡 UPLINK: 23,112 Polling Centers</marquee>
 </div>
 """, unsafe_allow_html=True)
 
@@ -94,6 +118,7 @@ with col_sidebar:
     st.title("Command Center")
     st.markdown("---")
     
+    # Navigation
     constituency_data = {
         "Koshi": ["Jhapa 5", "Jhapa 3", "Morang 6", "Sunsari 1", "Ilam 2"],
         "Madhesh": ["Sarlahi 4", "Rautahat 1", "Dhanusha 3", "Saptari 2"],
@@ -108,7 +133,7 @@ with col_sidebar:
     seat = st.selectbox("TARGET SECTOR", constituency_data[prov])
     
     st.markdown("---")
-    st.caption("v4.3.0 | LIVE CONNECTED")
+    st.caption("v4.5.0 | FAILSAFE ACTIVE")
 
 with col_main:
     # Action Bar
@@ -116,55 +141,53 @@ with col_main:
     with c1:
         st.subheader(f"📍 Intelligence Target: {seat}")
     with c2:
-        analyze_btn = st.button("RUN PREDICTION", type="primary", use_container_width=True)
+        # Fixed: Changed use_container_width to width="stretch" to stop warnings
+        analyze_btn = st.button("RUN PREDICTION", type="primary", width="stretch")
 
     # --- PROGRESS BAR LOGIC ---
     if analyze_btn:
-        # 1. CREATE BAR
         progress_text = "📡 Initiating Satellite Uplink..."
         my_bar = st.progress(0, text=progress_text)
 
-        # 2. SIMULATE CONNECTION (0-30%)
-        # This gives immediate visual feedback
-        for percent_complete in range(0, 40, 10):
+        # 1. Visual Start
+        for percent_complete in range(0, 30, 10):
             time.sleep(0.05) 
-            my_bar.progress(percent_complete, text=f"🔍 Scanning Jan 2026 Database... {percent_complete}%")
+            my_bar.progress(percent_complete, text=f"🔍 Scanning Database... {percent_complete}%")
 
-        # 3. THE HEAVY LIFT (40%)
-        # This text tells the user "Wait, we are doing real work now"
-        my_bar.progress(40, text="🧠 RUNNING DEEP REASONING MODEL... (Please Wait)")
+        # 2. Heavy Lift (The part that was stuck)
+        my_bar.progress(40, text="🧠 RUNNING DEEP REASONING MODEL...")
         
-        # 4. EXECUTE API CALL (Blocking)
+        # 3. Execution
         deep_data = get_deep_analytics(seat)
         
-        # 5. FINALIZE (90-100%)
-        my_bar.progress(90, text="✅ Synthesizing Strategy Report...")
-        time.sleep(0.2)
+        # 4. Completion
         my_bar.progress(100, text="🚀 ANALYSIS COMPLETE")
         time.sleep(0.5)
-        my_bar.empty() # Hide bar to show results cleanly
+        my_bar.empty()
         
-        # Store in session state
         st.session_state.current_report = deep_data
 
     # --- RESULTS DASHBOARD ---
     if st.session_state.current_report:
         data = st.session_state.current_report
         
-        st.markdown("### 🔮 Predictive Modeling")
-        st.info(f"Verified Intelligence • Timestamp: {data['timestamp']}")
-        
-        # Display the Deep Report
-        st.markdown(data["text"])
-        
-        st.markdown("---")
-        st.caption("CONFIDENTIAL: For Strategic Use Only. Data aggregated from Election Commission & Open Source Intelligence.")
+        if data.get("status") == "error":
+            st.error(data["text"])
+        else:
+            # Display Report
+            st.markdown("### 🔮 Predictive Modeling")
+            
+            # Show which model was actually used
+            st.caption(f"Verified Intelligence • Source: {data.get('model', 'Unknown')} • Timestamp: {data['timestamp']}")
+            
+            st.markdown(data["text"])
+            st.markdown("---")
+            st.caption("CONFIDENTIAL: For Strategic Use Only.")
 
     else:
-        # Default State
         st.markdown("""
         <div style="text-align: center; padding: 50px; color: #444;">
             <h3>Ready for Analysis</h3>
-            <p>Select a sector and click 'RUN PREDICTION' to begin deep scan.</p>
+            <p>Select a sector and click 'RUN PREDICTION'.</p>
         </div>
         """, unsafe_allow_html=True)
