@@ -5,10 +5,10 @@ from google import genai
 from google.genai import types
 
 # --- CONFIGURATION ---
-# Primary: The powerful model you want
-DEEP_MODEL = "gemini-3-pro-preview" 
-# Fallback: The reliable model if Pro hangs
-FALLBACK_MODEL = "gemini-2.0-flash-exp"
+# 1. USE STABLE PRODUCTION MODELS (To fix the 404 Error)
+# These IDs are valid for all users right now.
+DEEP_MODEL = "gemini-1.5-pro"   # The smart model (Stable)
+FAST_MODEL = "gemini-1.5-flash" # The fast fallback (Stable)
 
 # Initialize Client
 try:
@@ -27,12 +27,11 @@ st.set_page_config(page_title="Nepal 2026 Strategy Room", layout="wide", initial
 if "current_report" not in st.session_state:
     st.session_state.current_report = None
 
-# --- CORE LOGIC (With Safety Net) ---
+# --- CORE LOGIC ---
 @st.cache_data(ttl="1d", show_spinner=False)
 def get_deep_analytics(constituency_name):
     """
-    Robust function: Tries Gemini 3 Pro first. 
-    If it fails/hangs, falls back to Gemini 2 Flash instantly.
+    Robust function: Uses Stable Gemini 1.5 Pro.
     """
     prompt = f"""
     Act as a Chief Election Strategist for {constituency_name}, Nepal (March 5, 2026).
@@ -49,8 +48,8 @@ def get_deep_analytics(constituency_name):
     * **Key Factor:** [Detail]
     """
     
-    # Attempt 1: Deep Model
     try:
+        # Attempt 1: Gemini 1.5 Pro
         response = client.models.generate_content(
             model=DEEP_MODEL,
             contents=prompt,
@@ -61,21 +60,21 @@ def get_deep_analytics(constituency_name):
         return {
             "text": response.text,
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "model": "Gemini 3 Pro",
+            "model": "Gemini 1.5 Pro (Stable)",
             "status": "success"
         }
     except Exception as e:
-        # Attempt 2: Fallback (Safety Net)
+        # Attempt 2: Fallback to Flash if Pro fails
         try:
-            time.sleep(1) # Brief pause
+            time.sleep(1)
             fallback_resp = client.models.generate_content(
-                model=FALLBACK_MODEL,
+                model=FAST_MODEL,
                 contents=prompt
             )
             return {
                 "text": fallback_resp.text,
                 "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "model": "Gemini 2 Flash (Fallback)",
+                "model": "Gemini 1.5 Flash (Fallback)",
                 "status": "success"
             }
         except Exception as e2:
@@ -98,7 +97,6 @@ st.markdown("""
     .stProgress > div > div > div > div {
         background-color: #00FF94;
     }
-    /* Fix for large header */
     h1 { font-size: 2.5rem !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -133,7 +131,7 @@ with col_sidebar:
     seat = st.selectbox("TARGET SECTOR", constituency_data[prov])
     
     st.markdown("---")
-    st.caption("v4.5.0 | FAILSAFE ACTIVE")
+    st.caption("v4.6.0 | STABLE LINK")
 
 with col_main:
     # Action Bar
@@ -141,8 +139,7 @@ with col_main:
     with c1:
         st.subheader(f"📍 Intelligence Target: {seat}")
     with c2:
-        # Fixed: Changed use_container_width to width="stretch" to stop warnings
-        analyze_btn = st.button("RUN PREDICTION", type="primary")
+        analyze_btn = st.button("RUN PREDICTION", type="primary", use_container_width=True)
 
     # --- PROGRESS BAR LOGIC ---
     if analyze_btn:
@@ -154,8 +151,8 @@ with col_main:
             time.sleep(0.05) 
             my_bar.progress(percent_complete, text=f"🔍 Scanning Database... {percent_complete}%")
 
-        # 2. Heavy Lift (The part that was stuck)
-        my_bar.progress(40, text="🧠 RUNNING DEEP REASONING MODEL...")
+        # 2. Heavy Lift
+        my_bar.progress(40, text="🧠 RUNNING STRATEGY MODEL...")
         
         # 3. Execution
         deep_data = get_deep_analytics(seat)
@@ -174,12 +171,8 @@ with col_main:
         if data.get("status") == "error":
             st.error(data["text"])
         else:
-            # Display Report
             st.markdown("### 🔮 Predictive Modeling")
-            
-            # Show which model was actually used
             st.caption(f"Verified Intelligence • Source: {data.get('model', 'Unknown')} • Timestamp: {data['timestamp']}")
-            
             st.markdown(data["text"])
             st.markdown("---")
             st.caption("CONFIDENTIAL: For Strategic Use Only.")
