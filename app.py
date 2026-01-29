@@ -5,39 +5,41 @@ from google import genai
 from google.genai import types
 
 # 1. Setup Models
-# PRO: Runs once every 24h per seat for deep reasoning
 DEEP_MODEL = "gemini-3-pro-preview" 
-# FLASH: Runs instantly for immediate user feedback
 FAST_MODEL = "gemini-3-flash-preview"
 
 # Initialize Client
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-st.set_page_config(page_title="Nepal 2026: 165 Seat Predictor", layout="wide")
+st.set_page_config(page_title="Nepal 2026 Intel", layout="wide")
+
+# --- SESSION STATE INITIALIZATION (Crucial for UI Stability) ---
+if "current_report" not in st.session_state:
+    st.session_state.current_report = None
+if "report_type" not in st.session_state:
+    st.session_state.report_type = None
 
 # --- CACHING LOGIC ---
 
-# TIER 1: FAST INTEL (Short Cache)
-# This gives the "Instant" result while deep research happens
 @st.cache_data(ttl="1h", show_spinner=False)
 def get_fast_intel(constituency_name):
     prompt = f"""
-    Give me a quick 3-bullet summary for {constituency_name} (Nepal 2026 Election).
-    Focus on: Winner prediction and key rival. Keep it under 100 words.
+    Provide a structured 3-bullet summary for {constituency_name} (Nepal 2026 Election).
+    Format:
+    * **Winner Projection:** [Name/Party]
+    * **Key Rival:** [Name/Party]
+    * **X-Factor:** [Gen Z/Rebel/Alliance]
     """
     response = client.models.generate_content(
         model=FAST_MODEL,
         contents=prompt
     )
-    return f"⚡ **Quick Flash Analysis:**\n\n{response.text}"
+    return response.text
 
-# TIER 2: DEEP INTEL (24-Hour Cache)
-# This is the "Gold Standard" report that stays for 1 day
 @st.cache_data(ttl="1d", show_spinner=False)
 def get_daily_deep_intel(constituency_name):
     """
-    Runs DEEP research using Gemini 3 Pro.
-    Cached for 24 hours.
+    Runs DEEP research using Gemini 3 Pro. Cached for 24 hours.
     """
     prompt = f"""
     Perform a professional political deep dive for {constituency_name}, Nepal (March 5, 2026 Election).
@@ -54,23 +56,19 @@ def get_daily_deep_intel(constituency_name):
     )
     return {
         "text": response.text,
-        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     }
 
-# --- UI LAYOUT ---
+# --- UI HEADER ---
+ticker_html = """
+<div style="background-color: #1E1E1E; color: #00FF94; padding: 8px; border-radius: 5px; margin-bottom: 15px; font-family: monospace;">
+    <marquee>🚨 LIVE: 150,000 police deployed • 🗳️ 3,406 Candidates Finalized • ❄️ Logistics: Snow Alerts in Karnali • 🥊 Jhapa-5: Balen vs Oli Heat Map High</marquee>
+</div>
+"""
+st.markdown(ticker_html, unsafe_allow_html=True)
+st.title("🇳🇵 Nepal Election 2026: War Room")
 
-# News Ticker
-ticker_news = [
-    "🚨 NEWS: 150,000 election police to be deployed starting Feb 10.",
-    "🥊 BATTLE: Tensions high in Jhapa-5 as Balen vs Oli duel enters final phase.",
-    "📋 FINALIZED: 3,406 total candidates confirmed for 165 FPTP seats.",
-    "✈️ LOGISTICS: Helicopters readied for voting in snowbound districts."
-]
-st.markdown(f"""<div style="background-color: #ff4b4b; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px;"><marquee>{' | '.join(ticker_news)}</marquee></div>""", unsafe_allow_html=True)
-
-st.title("🇳🇵 Nepal Election 2026: Intelligence Hub")
-
-# Data Dictionary
+# --- DATA DICTIONARY ---
 constituency_data = {
     "Koshi (28)": ["Jhapa 5", "Jhapa 3", "Morang 6", "Sunsari 1", "Ilam 2"],
     "Madhesh (32)": ["Sarlahi 4", "Rautahat 1", "Dhanusha 3", "Saptari 2"],
@@ -81,58 +79,74 @@ constituency_data = {
     "Sudurpashchim (16)": ["Kailali 5", "Dadeldhura 1"]
 }
 
-col_sidebar, col_main = st.columns([1, 3], gap="large")
+col_nav, col_main = st.columns([1, 3], gap="medium")
 
-with col_sidebar:
-    st.subheader("📁 Navigation")
-    prov = st.selectbox("1. Province", list(constituency_data.keys()))
-    seat = st.selectbox("2. Constituency", constituency_data[prov])
+with col_nav:
+    st.subheader("📍 Select Zone")
+    prov = st.selectbox("Province", list(constituency_data.keys()))
+    seat = st.selectbox("Constituency", constituency_data[prov])
     
     st.markdown("---")
-    st.warning("🔄 **Daily Background Sync**")
-    st.caption("Run this once a day to pre-load deep research for all key seats.")
-    if st.button("Run 24h Batch Update"):
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        # Batch update loop
-        seats_to_update = constituency_data[prov] # Updates current province to save time
-        for i, s in enumerate(seats_to_update):
-            status_text.text(f"Deep Researching: {s}...")
-            # This triggers the cache function without displaying it
-            get_daily_deep_intel(s) 
-            progress_bar.progress((i + 1) / len(seats_to_update))
-        status_text.success("✅ Daily Intelligence Cache Updated!")
+    
+    # IMPROVED BATCH UPDATE (Uses Progress Bar & Toast)
+    if st.button("🔄 Sync Daily Cache"):
+        seats = constituency_data[prov]
+        bar = st.progress(0)
+        st.toast(f"Starting sync for {len(seats)} seats in {prov}...")
+        
+        for i, s in enumerate(seats):
+            # Calls the cache function silently
+            get_daily_deep_intel(s)
+            bar.progress((i + 1) / len(seats))
+            time.sleep(0.1) # UI breathing room
+            
+        st.toast("✅ Daily Intelligence Sync Complete!", icon="🎉")
+        time.sleep(1)
+        st.rerun()
 
 with col_main:
-    st.subheader(f"📊 Intelligence Report: {seat}")
-    
-    # THE "FAST ASAP" LOGIC
-    if st.button(f"🚀 Analyze {seat}"):
-        report_placeholder = st.empty()
+    # ACTION BUTTON
+    if st.button(f"🚀 Analyze {seat}", type="primary", use_container_width=True):
         
-        # STEP 1: Show Fast Result IMMEDIATELY
-        with st.spinner("Fetching Flash Intel..."):
-            fast_res = get_fast_intel(seat)
-            # Display fast result instantly
-            report_placeholder.markdown(f"""
-            <div style="border: 1px solid #ddd; padding: 15px; border-radius: 10px; background-color: #f0f2f6;">
-                {fast_res}
-            </div>
-            """, unsafe_allow_html=True)
+        # 1. FAST PHASE
+        with st.status("📡 Establishing Satellite Link...", expanded=True) as status:
+            st.write("Fetching instant flash intelligence...")
+            fast_data = get_fast_intel(seat)
+            st.session_state.current_report = {"fast": fast_data, "deep": None}
+            st.session_state.report_type = "fast"
+            status.update(label="⚡ Flash Data Received!", state="complete", expanded=False)
+            
+        # 2. DEEP PHASE (Background Check)
+        # We check if deep data is cached. If not, we run it.
+        # This keeps the user on the "Fast" tab until they want Deep.
+        deep_data = get_daily_deep_intel(seat)
+        st.session_state.current_report["deep"] = deep_data
+        st.session_state.report_type = "deep"
+        st.toast(f"🧠 Deep Research for {seat} is ready!", icon="✅")
+
+
+    # DISPLAY LOGIC (Using Tabs for Friendly UI)
+    if st.session_state.current_report:
         
-        # STEP 2: Check/Run Deep Research in Background
-        # The user is reading the Fast result while this runs
-        with st.spinner("Verifying with Deep Research (Gemini Pro)..."):
-            # This will finish instantly if cached ( < 24h), or take 10s if new
-            deep_data = get_daily_deep_intel(seat)
+        st.divider()
+        st.subheader(f"📊 Intelligence Report: {seat}")
+        
+        # TABS: The Friendly Way to handle "Fast vs Deep"
+        tab_fast, tab_deep = st.tabs(["⚡ Fast Pulse", "🧠 Deep Strategy"])
+        
+        with tab_fast:
+            if st.session_state.current_report["fast"]:
+                st.info("Instant Snapshot (Gemini 3 Flash)")
+                st.markdown(st.session_state.current_report["fast"])
             
-            # STEP 3: Overwrite with Deep Result once ready
-            report_placeholder.markdown(f"""
-            <div style="border-left: 5px solid #ff4b4b; padding: 15px; background-color: #ffffff;">
-                <small style="color: grey;">⚡ Verified Deep Report • Refreshed: {deep_data['timestamp']}</small>
-                <br><br>
-                {deep_data['text']}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.success("Analysis upgraded to Deep Research.")
+        with tab_deep:
+            deep_content = st.session_state.current_report["deep"]
+            if deep_content:
+                st.success(f"Verified Deep Research (Gemini 3 Pro) • {deep_content['timestamp']}")
+                st.markdown(deep_content["text"])
+            else:
+                st.warning("Deep research is compiling... check back in 10 seconds.")
+                
+    else:
+        # EMPTY STATE
+        st.info("👈 Select a constituency and click 'Analyze' to begin.")
