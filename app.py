@@ -2,58 +2,29 @@ import streamlit as st
 from google import genai
 from google.genai import types
 
-# 1. Setup the High-Speed Client
+# 1. Setup Client
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 st.set_page_config(page_title="Nepal 2026 War Room", layout="wide")
 
-# 2. Professional Sidebar Navigation
-st.sidebar.title("🗳️ Constituency Navigator")
-
-# Data organization by Province (All 165)
-provinces = {
-    "Koshi (28)": ["Jhapa 5", "Morang 6", "Sunsari 1", "Jhapa 3", "Ilam 2"],
-    "Madhesh (32)": ["Sarlahi 4", "Dhanusha 3", "Saptari 2", "Parsa 1"],
-    "Bagmati (33)": ["Kathmandu 1", "Kathmandu 4", "Chitwan 2", "Chitwan 3", "Lalitpur 3"],
-    "Gandaki (18)": ["Gorkha 2", "Kaski 2", "Tanahun 1"],
-    "Lumbini (26)": ["Rupandehi 2", "Dang 2", "Banke 2"],
-    "Karnali (12)": ["Surkhet 2", "Jumla 1"],
-    "Sudurpashchim (16)": ["Kailali 5", "Kanchanpur 2"]
-}
-
-selected_province = st.sidebar.selectbox("Select Province", list(provinces.keys()))
-selected_constituency = st.sidebar.selectbox("Select Seat", provinces[selected_province])
-
-# 3. Top 10 High-Stakes Battles (Pinned on Left)
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔥 Top 10 Titan Battles")
-top_10 = {
+# Top 10 High-Stakes Battles Data (Jan 2026)
+battles = {
     "Jhapa 5": "Balen Shah vs. KP Oli",
     "Sarlahi 4": "Gagan Thapa vs. Amresh Singh",
-    "Chitwan 2": "Rabi Lamichhane vs. NC/UML Alliance",
+    "Chitwan 2": "Rabi Lamichhane vs. NC/UML",
     "Gorkha 2": "Prachanda vs. Madhav Devkota",
     "Sunsari 1": "Harka Sampang vs. Major Parties",
-    "Jhapa 3": "Rajendra Lingden vs. Krishna Sitaula",
+    "Jhapa 3": "Rajendra Lingden vs. NC",
     "Chitwan 3": "Sobita Gautam vs. Renu Dahal",
-    "Tanahun 1": "Swarnim Wagle vs. NC Candidate",
+    "Tanahun 1": "Swarnim Wagle vs. Govinda Bhattarai",
     "Kathmandu 1": "Pukar Bam vs. Prakash Man Singh",
     "Kathmandu 4": "Dr. Toshima Karki vs. Nain Singh Mahar"
 }
-battle_pick = st.sidebar.radio("Quick View Battle:", list(top_10.keys()))
 
-# 4. Standardized War Room Intelligence Logic
+# Standardized Research Function
 @st.cache_data(ttl=600)
-def get_war_room_report(constituency):
-    prompt = f"""
-    Act as a 2026 Election Intelligence Officer. 
-    Analyze {constituency}, Nepal for the March 5 election. 
-    FACTS TO INCLUDE:
-    - Balen/Rabi PM candidacy impact.
-    - Jan 20, 2026 nomination data (3,406 total candidates nationwide).
-    - Gen Z sentiment (52% of voters are 18-40).
-    
-    FORMAT: Use tables for stats and bold headers for ground analysis.
-    """
+def get_report(constituency, battle_name, detail_level="summary"):
+    prompt = f"Analyze {constituency} ({battle_name}) for March 5, 2026. Detail level: {detail_level}."
     response = client.models.generate_content(
         model="gemini-3-flash-preview",
         contents=prompt,
@@ -61,15 +32,44 @@ def get_war_room_report(constituency):
     )
     return response.text
 
-# 5. Main Display
-col_info, col_battle = st.columns([1, 1])
+# --- 3-COLUMN LAYOUT ---
+col_left, col_center, col_right = st.columns([1, 2, 1], gap="large")
 
-with col_info:
-    st.header(f"📊 Report: {selected_constituency}")
-    if st.button(f"Analyze {selected_constituency}"):
-        st.markdown(get_war_room_report(selected_constituency))
+# LEFT COLUMN: Top 10 Battle List & Summary
+with col_left:
+    st.subheader("🔥 Top 10 Battles")
+    battle_selection = st.radio("Select to see summary:", list(battles.keys()), label_visibility="collapsed")
+    
+    st.markdown(f"**{battle_selection}**")
+    st.caption(battles[battle_selection])
+    
+    # Summary Result within the left side
+    summary = get_report(battle_selection, battles[battle_selection], "summary")
+    st.write(summary[:250] + "...") # Show short summary
+    
+    if st.button("🔍 See More (Move to Center)"):
+        st.session_state.center_view = battle_selection
 
-with col_battle:
-    st.header(f"🥊 Battle: {battle_pick}")
-    if st.button(f"Show {battle_pick} Duel"):
-        st.markdown(get_war_room_report(battle_pick))
+# CENTER COLUMN: The Main Predictor & Deep Results
+with col_center:
+    st.subheader("🎯 Election Predictor")
+    
+    # Constituency Dropdown
+    all_constituencies = ["Kathmandu 4", "Kaski 2", "Jhapa 5", "Sarlahi 4"] # Simplified list
+    target = st.selectbox("Choose a constituency to predict:", all_constituencies)
+    
+    if st.button(f"Analyze {target}") or 'center_view' in st.session_state:
+        # If 'See More' was clicked on left, override center target
+        display_target = st.session_state.get('center_view', target)
+        with st.spinner(f"Analyzing {display_target}..."):
+            full_report = get_report(display_target, battles.get(display_target, ""), "full")
+            st.markdown(full_report)
+
+# RIGHT COLUMN: Auto-Populating Battle Results
+with col_right:
+    st.subheader("📈 Live Battle Stats")
+    # This automatically updates whenever the 'battle_selection' on the left changes
+    with st.container(border=True):
+        st.write(f"**Live Pulse: {battle_selection}**")
+        st.metric("Voter Interest", "High", delta="7% Jan 2026")
+        st.write(get_report(battle_selection, battles[battle_selection], "metrics"))
