@@ -4,11 +4,10 @@ from google import genai
 from google.genai import types
 
 # 1. Setup Models & Client
-# DEEP_MODEL: Used once every 24h per seat for deep reasoning (Thinking Level: High)
 DEEP_MODEL = "gemini-3-pro-preview" 
-# FAST_MODEL: Used for quick interaction (not used in this specific cache logic but good to have)
 FAST_MODEL = "gemini-3-flash-preview"
 
+# Initialize Client
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 st.set_page_config(page_title="Nepal 2026: 165 Seat Predictor", layout="wide")
@@ -60,12 +59,12 @@ def get_daily_deep_intel(constituency_name):
     3. Predict the winner probability based on ground sentiment.
     """
     
-    # Use Gemini 3 Pro with High Thinking Level for the Seed Research
+    # Use Gemini 3 Pro for the Seed Research
+    # Removed 'thinking_level' to fix ValidationError
     response = client.models.generate_content(
         model=DEEP_MODEL,
         contents=prompt,
         config=types.GenerateContentConfig(
-            thinking_level="high", # Forces deep reasoning
             tools=[types.Tool(google_search=types.GoogleSearch())]
         )
     )
