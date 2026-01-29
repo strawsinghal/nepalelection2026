@@ -1,24 +1,41 @@
 import streamlit as st
-import pandas as pd
-import plotly.express as px
+from google import genai
+from google.genai import types
 
-st.title("📊 National Election Pulse: 2026 Shift")
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# 1. THE TRUTH: Popular Sentiment vs. Traditional Seats
-# This data reflects the massive shift toward the Balen/Rabi alliance
-mood_data = pd.DataFrame({
-    "Indicator": ["Voter Interest", "Gen Z Support", "NC-UML Trust", "RSP Alliance Trust"],
-    "Score": [92, 84, 19, 70] # Based on latest Jan 2026 pulse reports
-})
+st.title("📊 2026 Social Media Sentiment Pulse")
+st.markdown("---")
 
-st.subheader("🔥 The Gen Z Disruptor Metric")
-fig = px.bar(mood_data, x="Indicator", y="Score", color="Indicator", range_y=[0, 100])
-st.plotly_chart(fig)
+# 1. Targeted Keywords for 2026
+keywords = ["#BalenForPM", "#NoNotAgain", "#RabiAlliance", "#GenZNepal", "#March5Revolution"]
 
-st.markdown("""
-### 📢 Real-Time National Trends (Jan 29, 2026)
-* **The Balen-Rabi Wave:** RSP unified with Kathmandu Mayor **Balen Shah** (PM candidate) and **Kulman Ghising** (Vice-Chair), creating a massive "Alternative Force".
-* **The Post-Sept Uprising Sentiment:** 95% of young voters feel traditional leaders (Deuba, Oli, Prachanda) represent "Elite Capture" and dysfunction.
-* **Direct Election Demand:** Pro-direct-election camps led by Balen Shah and Gen Z leaders are threatening a boycott if the system isn't reformed.
-* **Strategic Battleground:** In Jhapa-5, Balen Shah is currently predicted to significantly threaten KP Oli's historic stronghold.
-""")
+# 2. Sentiment Scraping Logic
+@st.cache_data(ttl=1800) # Refresh every 30 minutes
+def scrape_social_sentiment(keyword_list):
+    # This prompt forces the AI to look at LIVE social trends from Jan 2026
+    prompt = f"""
+    Analyze current social media sentiment (TikTok, Twitter, Facebook) in Nepal as of late Jan 2026.
+    Focus on these specific keywords: {keyword_list}.
+    
+    REQUIRED FORMAT:
+    1. TRENDING TOPIC: (e.g., Balen-Rabi Alliance momentum)
+    2. SENTIMENT SCORE: (Positive/Negative/Neutral %)
+    3. TOP GEN Z NARRATIVE: (What is the youth saying about traditional parties vs alternative?)
+    4. ANOMALY DETECTOR: (Identify any sudden shifts in mood since Jan 20 nominations)
+    """
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())]
+        )
+    )
+    return response.text
+
+# 3. Display Interface
+st.subheader("🔥 Live Sentiment Tracker")
+if st.button("🔍 Scrape Live 2026 Trends"):
+    with st.spinner("Analyzing TikTok and Twitter data clusters..."):
+        pulse_report = scrape_social_sentiment(keywords)
+        st.markdown(pulse_report)
